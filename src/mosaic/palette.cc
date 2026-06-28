@@ -1,5 +1,6 @@
 #include "mosaic/palette.h"
 
+#include "mosaic/generated_catalog.h"
 #include "mosaic/scanner.h"
 
 namespace mosaic {
@@ -21,6 +22,14 @@ bool Palette::Parse(Scanner* scanner, std::string* error) {
     gradient_ = false;
   } else if (mode == "gradient") {
     gradient_ = true;
+  } else if (mode == "catalog") {
+    std::string preset_name;
+    if (!scanner->NextToken(&preset_name) || !LookupPresetPalette(preset_name, &colors_)) {
+      if (error) *error = "unknown palette preset";
+      return false;
+    }
+    gradient_ = false;
+    return true;
   } else {
     if (error) *error = "unknown palette mode";
     return false;
