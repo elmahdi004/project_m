@@ -7,10 +7,12 @@
 #include <vector>
 
 #include "mosaic/image.h"
+#include "mosaic/image_ops.h"
+#include "mosaic/montage.h"
 #include "mosaic/ppm.h"
 #include "mosaic/report.h"
-#include "mosaic/scanner.h"
-#include "mosaic/scene.h"
+#include "mosaic/style_presets.h"
+#include "mosaic/scene_io.h"
 #include "mosaic/sprite_sheet.h"
 
 namespace mosaic {
@@ -20,24 +22,9 @@ struct Options {
   std::string command;
   std::string input_path;
   std::string output_path;
+  std::string preset_name;
   bool ascii = false;
 };
-
-bool ReadFile(const std::string& path, std::string* contents, std::string* error) {
-  std::ifstream input(path, std::ios::binary);
-  if (!input) {
-    if (error) *error = "unable to open input file";
-    return false;
-  }
-  std::ostringstream buffer;
-  buffer << input.rdbuf();
-  if (!input.good() && !input.eof()) {
-    if (error) *error = "unable to read input file";
-    return false;
-  }
-  *contents = buffer.str();
-  return true;
-}
 
 bool WriteFile(const std::string& path, const std::string& contents, std::string* error) {
   std::ofstream output(path, std::ios::binary);
@@ -55,7 +42,7 @@ bool WriteFile(const std::string& path, const std::string& contents, std::string
 
 bool ParseOptions(int argc, char* argv[], Options* options, std::string* error) {
   if (argc < 3) {
-    if (error) *error = "usage: mosaicc <inspect|render|spritesheet> <input> [output] [--ascii]";
+    if (error) *error = "usage: mosaicc <inspect|render|spritesheet|montage> <input> [output] [--ascii]";
     return false;
   }
   options->command = argv[1];
@@ -64,6 +51,8 @@ bool ParseOptions(int argc, char* argv[], Options* options, std::string* error) 
     const std::string argument = argv[i];
     if (argument == "--ascii") {
       options->ascii = true;
+    } else if (argument == "--preset" && i + 1 < argc) {
+      options->preset_name = argv[++i];
     } else if (options->output_path.empty()) {
       options->output_path = argument;
     } else {
@@ -74,36 +63,18 @@ bool ParseOptions(int argc, char* argv[], Options* options, std::string* error) 
   return true;
 }
 
-bool LoadScene(const std::string& input_path, Scene* scene, Image* image, std::string* error) {
-  std::string contents;
-  if (!ReadFile(input_path, &contents, error)) {
-    return false;
-  }
-  Scanner scanner(contents);
-  std::string parse_error;
-  if (!scene->Parse(&scanner, &parse_error)) {
-    if (error) *error = parse_error;
-    return false;
-  }
-  *image = Image(scene->width(), scene->height());
-  image->ReplacePixels(scene->width(), scene->height(), scene->Composite());
-  return true;
-}
-
 bool RunInspect(const Options& options, std::string* error) {
-  std::string contents;
-  if (!ReadFile(options.input_path, &contents, error)) {
-    return false;
-  }
-  Scanner scanner(contents);
   Scene scene;
   std::string parse_error;
-  if (!scene.Parse(&scanner, &parse_error)) {
+  Image image;
+  if (!LoadSceneFile(options.input_path, &scene, &image, &parse_error)) {
     if (error) *error = parse_error;
     return false;
   }
-  Image image(scene.width(), scene.height());
-  image.ReplacePixels(scene.width(), scene.height(), scene.Composite());
+  if (!options.preset_name.empty() && !ApplyStylePreset(options.preset_name, &image)) {
+    if (error) *error = "unknown style preset";
+    return false;
+  }
   std::cout << FormatSceneReport(BuildSceneReport(scene, image)) << std::endl;
   return true;
 }
@@ -111,7 +82,11 @@ bool RunInspect(const Options& options, std::string* error) {
 bool RunRender(const Options& options, std::string* error) {
   Scene scene;
   Image image;
-  if (!LoadScene(options.input_path, &scene, &image, error)) {
+  if (!LoadSceneFile(options.input_path, &scene, &image, error)) {
+    return false;
+  }
+  if (!options.preset_name.empty() && !ApplyStylePreset(options.preset_name, &image)) {
+    if (error) *error = "unknown style preset";
     return false;
   }
   std::ostringstream rendered;
@@ -134,9 +109,36 @@ bool RunRender(const Options& options, std::string* error) {
   return WriteFile(options.output_path, rendered.str(), error);
 }
 
+bool RunMontage(const Options& options, std::string* error) {
+  Image montage = BuildMontageFromDirectory(options.input_path, error);
+  if (montage.empty()) {
+    return false;
+  }
+
+  if (!options.preset_name.empty() && !ApplyStylePreset(options.preset_name, &montage)) {
+    if (error) *error = "unknown style preset";
+    return false;
+  }
+
+  if (options.ascii || options.output_path.empty()) {
+    std::string preview = montage.AsciiPreview();
+    if (options.output_path.empty()) {
+      std::cout << preview;
+      return true;
+    }
+    return WriteFile(options.output_path, preview, error);
+  }
+
+  std::ostringstream rendered;
+  if (!WriteBinaryPpm(montage, &rendered, error)) {
+    return false;
+  }
+  return WriteFile(options.output_path, rendered.str(), error);
+}
+
 bool RunSpriteSheetCommand(const Options& options, std::string* error) {
   std::string contents;
-  if (!ReadFile(options.input_path, &contents, error)) {
+  if (!LoadTextFile(options.input_path, &contents, error)) {
     return false;
   }
   SpriteSheet sheet;
@@ -166,6 +168,9 @@ int RunCli(int argc, char* argv[]) {
   }
   if (options.command == "spritesheet") {
     return RunSpriteSheetCommand(options, &error) ? 0 : (std::cerr << error << std::endl, 1);
+  }
+  if (options.command == "montage") {
+    return RunMontage(options, &error) ? 0 : (std::cerr << error << std::endl, 1);
   }
   std::cerr << "unknown command" << std::endl;
   return 1;
