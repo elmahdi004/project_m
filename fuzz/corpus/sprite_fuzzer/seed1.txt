@@ -1,0 +1,1 @@
+sheet atlas 8 8 4 tile_a tile_b tile_c tile_d

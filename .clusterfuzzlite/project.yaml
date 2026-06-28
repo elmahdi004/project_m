@@ -1,0 +1,3 @@
+fuzz_targets:
+  - parser_fuzzer
+  - sprite_fuzzer

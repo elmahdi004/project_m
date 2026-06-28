@@ -1,0 +1,1 @@
+scene 4 3 gradient 3 #112233 #445566 #778899 rows 2 2 ref 1 1 lit #abcdef 2 layer0 1 layer1 0 1 #101010
