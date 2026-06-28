@@ -23,7 +23,7 @@ void ReadLayerPixels(Layer* layer, const RleDecoder& decoder, const Palette& pal
 bool Scene::Parse(Scanner* scanner, std::string* error) {
   layers_.clear();
   background_.clear();
-  palette_ = nullptr;
+  palette_ = Palette{};
   width_ = 0;
   height_ = 0;
 
@@ -41,7 +41,7 @@ bool Scene::Parse(Scanner* scanner, std::string* error) {
   if (!palette.Parse(scanner, error)) {
     return false;
   }
-  palette_ = &palette;
+  palette_ = std::move(palette);
 
   RleDecoder decoder;
   if (!decoder.Parse(scanner, error)) {
@@ -102,8 +102,8 @@ std::vector<Color> Scene::Composite() const {
     }
   }
 
-  if (!canvas.empty() && palette_ != nullptr && !background_.empty() && background_.size() > 1) {
-    const Color& accent = palette_->Lookup(canvas.size() + background_.size());
+  if (!canvas.empty() && !background_.empty() && background_.size() > 1) {
+    const Color& accent = palette_.Lookup(canvas.size() + background_.size());
     canvas[0] = Blend(canvas[0], accent);
   }
 

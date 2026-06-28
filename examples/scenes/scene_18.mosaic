@@ -1,0 +1,28 @@
+scene 11 8
+gradient 6
+#9abafe
+#abd727
+#bcf450
+#cd1179
+#de2ea2
+#ef4bcb
+rows 8 12
+1 ref 0
+2 lit #e771bd
+3 ref 2
+1 lit #29a7fb
+2 ref 4
+3 lit #6bdd39
+1 ref 0
+2 lit #ad1377
+3 ref 2
+1 lit #ef49b5
+2 ref 4
+3 lit #317ff3
+2
+layer_18_0
+1
+layer_18_1
+0
+1
+#ea3256

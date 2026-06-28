@@ -1,24 +1,35 @@
 # Fenrir Mosaic
 
-Fenrir Mosaic is a small C++17 content pipeline that parses a scene description, loads palette data, expands run-length encoded pixel spans, and composites sprite layers into an image-like buffer. The repository is structured as a real fuzzing target: the parser and renderer are reachable through two separate libFuzzer entry points, and the build is wired for ClusterFuzzLite so the project can be compiled and fuzzed without interactive setup.
+Fenrir Mosaic is a small C++17 scene toolchain for working with layered artwork. It parses a compact text scene format, resolves palette data, expands run-length encoded spans, composites the layers into a raster image, and can write that result as a PPM file or a compact ASCII preview. The repository also includes a sprite-sheet inspector for checking atlas metadata and a command-line interface for rendering or reviewing inputs from the shell.
 
-The code is intentionally split across several modules so fuzzing can exercise more than one path. `parser_fuzzer` drives the scene parser, palette handling, span decoding, and compositing flow. `sprite_fuzzer` targets the sprite-sheet loader and contact-sheet formatting path. A large generated catalog module is included to keep the project substantial and to provide a realistic, data-heavy lookup path instead of a toy stub.
+The project is organized as a real application rather than a harness wrapper. The core library lives under `src/mosaic/`, with reusable pieces for parsing, palette handling, image manipulation, report generation, and PPM output. The `examples/` directory contains a larger set of scene and sprite-sheet documents that exercise the CLI in realistic ways, while `fuzz/` keeps the libFuzzer entry points for parser and sprite-sheet validation.
+
+## What it does
+
+- Parse scene documents that describe dimensions, palettes, spans, layers, and background colors.
+- Render a scene into an image buffer and export it as binary or ASCII PPM.
+- Inspect scene statistics such as layer count, color diversity, and a text preview.
+- Inspect sprite-sheet documents and summarize their tile metadata.
 
 ## Layout
 
-- `src/mosaic/` - core parser, palette logic, render path, and generated catalog lookup
-- `fuzz/` - fuzz targets, dictionaries, and seed corpus
-- `.clusterfuzzlite/` - build script and fuzz target manifest
+- `src/mosaic/` - reusable library code for parsing, rendering, images, reports, and output formats
+- `src/main.cc` - CLI entry point that wires the library into the `mosaicc` tool
+- `examples/` - sample scenes and sprite sheets you can render or inspect immediately
+- `fuzz/` - libFuzzer entry points, dictionaries, and seed corpus for parser validation
+- `.clusterfuzzlite/` - build script and fuzz-target manifest
+
+## Commands
+
+- `mosaicc inspect <scene-file>` prints a short report and ASCII preview.
+- `mosaicc render <scene-file> [output.ppm] [--ascii]` writes a rendered scene.
+- `mosaicc spritesheet <sheet-file>` prints the atlas summary.
 
 ## Fuzz targets
 
-- `parser_fuzzer` - parses and validates a complete scene
-- `sprite_fuzzer` - parses a sprite sheet and exercises the contact-sheet path
+- `parser_fuzzer` - exercises the scene parser and renderer path.
+- `sprite_fuzzer` - exercises the sprite-sheet loader and contact-sheet path.
 
-## Purpose
+## Example data
 
-This repository is meant to be a standalone, private fuzzing submission. The goal is to provide a non-trivial codebase that can surface real crashes under sanitizers and then be patched without disabling the harness or weakening coverage. The seed corpus is there to help the fuzzer reach structured input paths quickly, while the generated catalog and multiple entry points keep the repository large enough and varied enough to behave like a real target rather than a minimal example.
-
-## Build shape
-
-The ClusterFuzzLite build script compiles every harness into `$OUT` from the repository root. That means the sources, fuzz targets, and generated lookup data are all self-contained in this tree, and the build does not depend on network access, private credentials, or local machine-specific paths.
+The repository ships with multiple ready-to-use inputs under `examples/scenes/` and `examples/sheets/`. They are useful for manual checks, smoke-testing the CLI, and giving the fuzz targets structured starting points.

@@ -25,11 +25,12 @@ class Scene {
   std::size_t layer_count() const { return layers_.size(); }
   std::size_t width() const { return width_; }
   std::size_t height() const { return height_; }
+  const Palette& palette() const { return palette_; }
 
  private:
   std::size_t width_ = 0;
   std::size_t height_ = 0;
-  const Palette* palette_ = nullptr;
+  Palette palette_;
   std::vector<Layer> layers_;
   std::vector<Color> background_;
 };
